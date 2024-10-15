@@ -70,11 +70,15 @@ class MachineRefillEvent implements IEvent {
   constructor(private readonly _refill: number, private readonly _machineId: string) {}
 
   machineId(): string {
-    throw new Error("Method not implemented.");
+    return this._machineId;
+  }
+  refillQty(): number {
+
+    return this._refill
   }
 
   type(): string {
-    throw new Error("Method not implemented.");
+    return 'MachineRefill'
   }
 }
 
@@ -91,9 +95,21 @@ class MachineSaleSubscriber implements ISubscriber {
 }
 
 class MachineRefillSubscriber implements ISubscriber {
-  handle(event: IEvent): void {
-    throw new Error("Method not implemented.");
+  machines: Machine[]
+  
+  constructor(machines: Machine[]){
+    this.machines = machines
   }
+
+  handle(event: MachineRefillEvent): void {
+   const machineIndex = this.machines.findIndex((machine)=> machine.id === event.machineId())
+   const machineForRefill = this.machines[machineIndex]
+   
+   machineForRefill.stockLevel += event.refillQty(); 
+   
+  }
+
+
 }
 
 
