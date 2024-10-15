@@ -48,19 +48,19 @@ class PublishSubscribeService implements IPublishSubscribeService{
    
 }
 
- 
+
 // implementations
 class MachineSaleEvent implements IEvent {
   constructor(private readonly _sold: number, private readonly _machineId: string) {}
-
+  
   machineId(): string {
     return this._machineId;
   }
-
+  
   getSoldQuantity(): number {
     return this._sold
   }
-
+  
   type(): string {
     return 'sale';
   }
@@ -68,17 +68,39 @@ class MachineSaleEvent implements IEvent {
 
 class MachineRefillEvent implements IEvent {
   constructor(private readonly _refill: number, private readonly _machineId: string) {}
-
+  
   machineId(): string {
     return this._machineId;
   }
   refillQty(): number {
-
+    
     return this._refill
   }
-
+  
   type(): string {
     return 'MachineRefill'
+  }
+}
+class LowStockWarningEvent implements IEvent {
+    constructor(private readonly _machineId: string) {}
+
+    machineId(): string {
+      return this._machineId;
+    }
+
+    type(): string {
+      return 'lowStockWarning';
+    }
+}
+
+class StockLevelOkEvent implements IEvent{
+  constructor(private readonly _machineId: string){}
+
+  machineId(): string {
+    return this._machineId;
+  }
+  type(): string {
+    return 'stockLevelOk';
   }
 }
 
@@ -97,21 +119,44 @@ class MachineSaleSubscriber implements ISubscriber {
 class MachineRefillSubscriber implements ISubscriber {
   machines: Machine[]
   
-  constructor(machines: Machine[]){
+  
+  constructor(private publishService: PublishSubscribeService, machines: Machine[]){
     this.machines = machines
   }
 
   handle(event: MachineRefillEvent): void {
+   
    const machineIndex = this.machines.findIndex((machine)=> machine.id === event.machineId())
    const machineForRefill = this.machines[machineIndex]
    
+   if (machineIndex !== -1){
    machineForRefill.stockLevel += event.refillQty(); 
+    if (machineForRefill.stockLevel <3){
+      this.publishService.publish(new LowStockWarningEvent(machineForRefill.id))
+    } else {
+      this.publishService.publish(new StockLevelOkEvent(machineForRefill.id))
+    }
+   }
    
   }
-
-
 }
 
+class StockWarningSubscriber implements ISubscriber{
+  machines: Machine[]
+  
+  constructor(machines: Machine[]){
+    this.machines = machines
+  }
+
+  handle(event: IEvent): void {
+    if (event.type() === 'lowStockWarning'){
+      console.log(`Low stock warning for machine ${event.machineId()}`)
+    }
+    if (event.type() === 'stockLevelOk'){
+      console.log(`Stock level OK for machine ${event.machineId()}`)
+    }
+  }
+}
 
 // objects
 class Machine {
