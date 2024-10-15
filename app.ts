@@ -3,7 +3,6 @@ interface IEvent {
   type(): string;
   machineId(): string;
 }
-
 interface ISubscriber {
   handle(event: IEvent): void;
 }
@@ -11,10 +10,45 @@ interface ISubscriber {
 interface IPublishSubscribeService {
   publish (event: IEvent): void;
   subscribe (type: string, handler: ISubscriber): void;
-  // unsubscribe ( /* Question 2 - build this feature */ );
+  unsubscribe (type: string, handler: ISubscriber): void;
 }
 
+// 1.1 allow iSubscriber to register against an concrete IPublishSubscribeService object for an event type.
+// implement the publish method, so that when a publish event occurs, all subscribers of that event type published will have a chance to handle the event.
+class PublishSubscribeService implements IPublishSubscribeService{
+  subscribers: Map <string, Set<ISubscriber>> = new Map()
+  machines: Machine[] = [];
 
+  publish(event: IEvent): void {
+    const eventType : string = event.type()
+    const handlers = this.subscribers.get(eventType)
+    if (handlers){
+      handlers.forEach(handler => handler.handle(event))
+    }
+  }
+
+  
+  subscribe(type: string, handler: ISubscriber): void {
+    
+    if (!this.subscribers.get(type)){
+    this.subscribers.set(type, new Set())
+    } else {
+      this.subscribers.get(type)?.add(handler)
+    }
+  }
+
+  unsubscribe(type: string, handler: ISubscriber): void {
+    if (!this.subscribers.get(type)){
+      throw new Error (`${type} not found`)
+    }
+    else {
+      this.subscribers.get(type)?.delete(handler)
+    }
+  }
+   
+}
+
+ 
 // implementations
 class MachineSaleEvent implements IEvent {
   constructor(private readonly _sold: number, private readonly _machineId: string) {}
