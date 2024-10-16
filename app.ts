@@ -15,6 +15,7 @@ interface IPublishSubscribeService {
 
 // 1.1 allow iSubscriber to register against an concrete IPublishSubscribeService object for an event type.
 // implement the publish method, so that when a publish event occurs, all subscribers of that event type published will have a chance to handle the event.
+//work
 class PublishSubscribeService implements IPublishSubscribeService{
   subscribers: Map <string, Set<ISubscriber>> = new Map()
   machines: Machine[] = [];
@@ -22,6 +23,7 @@ class PublishSubscribeService implements IPublishSubscribeService{
   publish(event: IEvent): void {
     const eventType : string = event.type()
     const handlers = this.subscribers.get(eventType)
+    
     if (handlers){
       handlers.forEach(handler => handler.handle(event))
     }
@@ -31,7 +33,7 @@ class PublishSubscribeService implements IPublishSubscribeService{
   subscribe(type: string, handler: ISubscriber): void {
     
     if (!this.subscribers.get(type)){
-    this.subscribers.set(type, new Set())
+    this.subscribers.set(type, new Set([handler]))
     } else {
       this.subscribers.get(type)?.add(handler)
     }
@@ -78,7 +80,7 @@ class MachineRefillEvent implements IEvent {
   }
   
   type(): string {
-    return 'MachineRefill'
+    return 'machineRefill'
   }
 }
 class LowStockWarningEvent implements IEvent {
@@ -110,16 +112,20 @@ class MachineSaleSubscriber implements ISubscriber {
   constructor (machines: Machine[]) {
     this.machines = machines; 
   }
-
+// removed the hardcoded index of 2 from the original code
   handle(event: MachineSaleEvent): void {
-    this.machines[2].stockLevel -= event.getSoldQuantity();
+    const machineIndex = this.machines.findIndex(machine => machine.id === event.machineId())
+    if (machineIndex !== -1){
+      this.machines[machineIndex].stockLevel -= event.getSoldQuantity();    
+    } else {
+      console.log(`no matched machine with id: ${event.machineId()}`)
+    }
   }
 }
 
 class MachineRefillSubscriber implements ISubscriber {
   machines: Machine[]
-  
-  
+    
   constructor(private publishService: PublishSubscribeService, machines: Machine[]){
     this.machines = machines
   }
@@ -131,6 +137,7 @@ class MachineRefillSubscriber implements ISubscriber {
    
    if (machineIndex !== -1){
    machineForRefill.stockLevel += event.refillQty(); 
+   console.log(`Machine ${machineForRefill.id} had stock level ${machineForRefill.stockLevel}, adding ${event.refillQty()} `)
     if (machineForRefill.stockLevel <3){
       this.publishService.publish(new LowStockWarningEvent(machineForRefill.id))
     } else {
@@ -196,16 +203,35 @@ const eventGenerator = (): IEvent => {
 (async () => {
   // create 3 machines with a quantity of 10 stock
   const machines: Machine[] = [ new Machine('001'), new Machine('002'), new Machine('003') ];
-
+  
+  const pubSubService: PublishSubscribeService = new PublishSubscribeService(); // implement and fix this
+  
   // create a machine sale event subscriber. inject the machines (all subscribers should do this)
   const saleSubscriber = new MachineSaleSubscriber(machines);
-
+  const refillSubscriber = new MachineRefillSubscriber(pubSubService,machines);
+  const warningSubscriber = new StockWarningSubscriber(machines);
+  
   // create the PubSub service
-  const pubSubService: IPublishSubscribeService = null as unknown as IPublishSubscribeService; // implement and fix this
-
+  pubSubService.subscribe('sale', saleSubscriber);
+  pubSubService.subscribe('machineRefill', refillSubscriber);
+  pubSubService.subscribe('lowStockWarning', warningSubscriber);
+  pubSubService.subscribe('stockLevelOk', warningSubscriber);
+  
+  
   // create 5 random events
   const events = [1,2,3,4,5].map(i => eventGenerator());
+  
+
 
   // publish the events
-  events.map(pubSubService.publish);
+  events.map(event=>{
+    pubSubService.publish(event)
+    console.log('event', event)
+  });
+
+  console.log(machines.map(machine=>`Machine ${machine.id} has stock level of ${machine.stockLevel}`))
+
+
 })();
+
+
