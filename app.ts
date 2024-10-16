@@ -226,7 +226,8 @@ const eventGenerator = (): IEvent => {
   
   
   // create 5 random events
-  const events = [1,2,3,4,5].map(i => eventGenerator());
+  // replaced i with _ for dismissing typescript type error
+  const events = [1,2,3,4,5].map(_ => eventGenerator());
   
   // publish the events
   events.map(event=>{
