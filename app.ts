@@ -109,14 +109,22 @@ class StockLevelOkEvent implements IEvent{
 class MachineSaleSubscriber implements ISubscriber {
   public machines: Machine[];
 
-  constructor (machines: Machine[]) {
+  constructor (private publishService: PublishSubscribeService, machines: Machine[]) {
     this.machines = machines; 
   }
 // removed the hardcoded index of 2 from the original code
   handle(event: MachineSaleEvent): void {
     const machineIndex = this.machines.findIndex(machine => machine.id === event.machineId())
     if (machineIndex !== -1){
-      this.machines[machineIndex].stockLevel -= event.getSoldQuantity();    
+      this.machines[machineIndex].stockLevel -= event.getSoldQuantity();
+      if (this.machines[machineIndex].stockLevel <3){
+        this.publishService.publish(new LowStockWarningEvent(this.machines[machineIndex].id))
+      } else {
+        this.publishService.publish(new StockLevelOkEvent(this.machines[machineIndex].id))
+      }
+
+
+
     } else {
       console.log(`no matched machine with id: ${event.machineId()}`)
     }
@@ -136,8 +144,7 @@ class MachineRefillSubscriber implements ISubscriber {
    const machineForRefill = this.machines[machineIndex]
    
    if (machineIndex !== -1){
-   machineForRefill.stockLevel += event.refillQty(); 
-   console.log(`Machine ${machineForRefill.id} had stock level ${machineForRefill.stockLevel}, adding ${event.refillQty()} `)
+    machineForRefill.stockLevel += event.refillQty(); 
     if (machineForRefill.stockLevel <3){
       this.publishService.publish(new LowStockWarningEvent(machineForRefill.id))
     } else {
@@ -207,7 +214,7 @@ const eventGenerator = (): IEvent => {
   const pubSubService: PublishSubscribeService = new PublishSubscribeService(); // implement and fix this
   
   // create a machine sale event subscriber. inject the machines (all subscribers should do this)
-  const saleSubscriber = new MachineSaleSubscriber(machines);
+  const saleSubscriber = new MachineSaleSubscriber(pubSubService,machines);
   const refillSubscriber = new MachineRefillSubscriber(pubSubService,machines);
   const warningSubscriber = new StockWarningSubscriber(machines);
   
@@ -221,15 +228,13 @@ const eventGenerator = (): IEvent => {
   // create 5 random events
   const events = [1,2,3,4,5].map(i => eventGenerator());
   
-
-
   // publish the events
   events.map(event=>{
     pubSubService.publish(event)
     console.log('event', event)
+    console.log(machines.map(machine=>`Machine ${machine.id} has stock level of ${machine.stockLevel}`))
   });
 
-  console.log(machines.map(machine=>`Machine ${machine.id} has stock level of ${machine.stockLevel}`))
 
 
 })();
